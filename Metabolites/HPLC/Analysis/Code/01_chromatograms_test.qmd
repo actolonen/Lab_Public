@@ -27,7 +27,7 @@ library(tidyverse);
 library(readr);
 library(gridExtra);
 library(readxl);
-Sys.setenv(RETICULATE_PYTHON = "/home/tolonen/.conda/envs/fermlab2/bin/python") # Set desired python installation
+Sys.setenv(RETICULATE_PYTHON = "/home/tolonen/.conda/envs/Lab_Public/bin/python") # Set desired python installation
 library(reticulate);
 
 
@@ -58,15 +58,15 @@ File IO
 ```{r File IO}
 
 # input: directory to read sample information file
-info.file = "/home/tolonen/Github/actolonen/Public/Analysis_Lab/Metabolites/HPLC/Analysis/Data/information_HPLC_DATE.xlsx";
+info.file = "/home/tolonen/Github/actolonen/Public/Lab_Public/Metabolites/HPLC/Analysis/Data/information_HPLC_DATE.xlsx";
 
 sample.data.in = read_excel(info.file, sheet = "Samples", skip=2, col_names = TRUE);
 
 # input: directory to read with .lcd files
-lcd.input.dir = "/home/tolonen/Github/actolonen/Public/Analysis_Lab/Metabolites/HPLC/Analysis/Data/LCD_LabSolutions";
+lcd.input.dir = "/home/tolonen/Github/actolonen/Public/Lab_Public/Metabolites/HPLC/Analysis/Data/LCD_LabSolutions";
 
 # output: directory to write chromConverter .txt files
-txt.output.dir = "/home/tolonen/Github/actolonen/Public/Analysis_Lab/Metabolites/HPLC/Analysis/Data/ChromConverter";
+txt.output.dir = "/home/tolonen/Github/actolonen/Public/Lab_Public/Metabolites/HPLC/Analysis/Data/ChromConverter";
 
 if (!dir.exists(txt.output.dir)) 
 {
@@ -74,7 +74,7 @@ if (!dir.exists(txt.output.dir))
 }
 
 # output: directory for all plots
-plots.output.dir= "/home/tolonen/Github/actolonen/Public/Analysis_Lab/Metabolites/HPLC/Analysis/Data/Chromatograms";
+plots.output.dir= "/home/tolonen/Github/actolonen/Public/Lab_Public/Metabolites/HPLC/Analysis/Data/Chromatograms";
 
 if (!dir.exists(plots.output.dir)) 
 {
@@ -197,7 +197,7 @@ return(chromatograms.all);
       
 ```
 
-# Methods
+# Main
 
 Organize data
 
