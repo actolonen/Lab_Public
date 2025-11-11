@@ -1,0 +1,612 @@
+---
+title: "Analyze growth experiment"
+author: "Fermlab"
+format: html
+editor: visual
+toc: TRUE
+code-fold: TRUE
+embed-resources: TRUE
+---
+
+# Introduction
+
+Description of growth experiment.
+
+# Setup
+
+Libraries
+
+```{r setup, echo=FALSE, message=FALSE}
+
+rm(list = ls()); # reset environment variables
+
+# libraries to include
+library(knitr);
+library(tidyverse);
+library(readxl);
+library(readr);
+library(gridExtra);
+library(plotly);
+library(growthcurver);
+
+```
+
+Flags/Config
+
+```{r Flags and config}
+
+# Type of plate reader: select "Bioscreen" or "Clario"
+plate_reader = "Bioscreen";
+
+# normalization method: 
+# "initial" = normalize OD600 by subtracting the reading at t=0h
+# "mean"  = subtract the mean OD600 reading at each time point
+norm_OD600 = "initial";
+
+mytheme = theme(axis.text.x = element_text(size = 6), 
+                axis.text.y = element_text(size = 6), 
+               axis.title.x = element_text(size = 6), 
+               axis.title.y = element_text(size = 6),
+               strip.text.x = element_text(size = 6),
+               legend.position = "bottom", 
+               legend.text = element_text(size=4),
+               aspect.ratio =0.5);
+
+color_vals = c("0" = "#BEBEBE", "1.5"="#68A2AD", "2"="#EEBC37");
+
+```
+
+File IO
+
+```{r File IO}
+
+# input data
+file.in = "growthData_Bioscreen.xlsx";
+path.in = "/home/tolonen/Github/actolonen/Public/Lab_Public/Growth/Microplates/Data";
+data.in = paste(path.in, file.in, sep = "/");
+
+```
+
+# Functions
+
+### Functions to organize data
+
+These functions take data from a specific type of plate reader and returns a data.frame with the following columns:
+
+1.  Hours
+2.  Well in microtiter plate
+3.  OD600
+4.  Strain (write "Blank" for lack of cells)
+5.  Dilution: dilution of cells into fresh medium in microtiter plate. For example, a 1/20 dilution = 0.05
+6.  Growth medium
+7.  Treatment (ie different carbon sources)
+
+Function to organize Clario data
+
+```{r function to organize clario data}
+
+organize_clario = function(data.in)
+{                              
+# output is data.frame = [Hours, Well, OD600, Treatment]
+
+plate.map = read_excel(data.in, sheet = "Informations", col_names = TRUE, skip = 3);
+growth.data = read_excel(data.in, sheet = "Raw data", col_names = TRUE, skip = 0);
+
+# plate map variables
+first.well = "A01";
+last.well = "H12";
+
+# parse plate.map
+plate.map = plate.map %>%
+  filter(!Treatment == "Empty");
+  
+# parse growth.data
+growth.data.long = growth.data %>%
+  select(-Well) %>%
+  rename("Time" = "...2") %>%
+  slice(-1) %>% # delete first row
+  slice(-1) %>%
+  mutate(Time = if_else(grepl("min", Time), true = Time, false =  paste(Time, "0 min", sep = " "))) %>%  
+# add minutes field where lacking
+  separate(Time, c("my.hours", "hours.label", "my.min", "min.label"), sep = " ") %>%
+  mutate(Hours = as.numeric(my.hours) + as.numeric(my.min)/60) %>%
+  #mutate(Seconds = as.numeric(Seconds)) %>%
+  #mutate(Hours = Seconds/3600) %>%
+  dplyr::select(Hours, first.well:last.well) %>%
+  pivot_longer(cols = first.well:last.well, names_to = "Well", values_to = "OD600");
+growth.data.long$OD600 = as.numeric(growth.data.long$OD600);
+
+# add treatment info
+growth.all = inner_join(growth.data.long, plate.map, by = "Well");
+
+growth.all = growth.all %>%
+    select(Well, Hours, OD600, Strain, Medium, Treatment, Dilution)
+
+return(growth.all)
+}
+
+```
+
+Function to organize Bioscreen data
+
+```{r function to organize bioscreen data}
+
+organize_bioscreen = function(data.in)
+{    
+# output is data.frame = [Hours, Well, OD600, Treatment]
+
+plate.map = read_excel(data.in, sheet = "Informations", col_names = TRUE, skip = 29);
+growth.data = read_excel(data.in, sheet = "Raw data", col_names = TRUE, skip = 2);
+
+# plate map variables
+first.well = "1";
+last.well = "199";
+
+# parse plate.map
+plate.map = plate.map %>%
+  filter(!Treatment == "Empty") %>%
+  mutate(Well = as.character(Well));
+  
+# calculate elapsed time in hours
+time1 = hms("00:00:00"); # start time
+growth.data = growth.data %>%
+  mutate(Time_hms = hms(Time)) %>%
+  mutate(Time_Elapsed = Time_hms - time1) %>%
+  mutate(Hours = hour(Time_Elapsed) + 
+         (minute(Time_Elapsed) / 60) + 
+         (second(Time_Elapsed)/3600));
+  
+growth.data.long = growth.data %>%
+  select(-Blank) %>%
+  dplyr::select(Hours, first.well:last.well) %>%
+  pivot_longer(cols = first.well:last.well, names_to = "Well", values_to = "OD600");
+growth.data.long$OD600 = as.numeric(growth.data.long$OD600);
+
+# remove contaminated wells
+#growth.data.long = growth.data.long %>%
+#  filter(!Well %in% c("A04", "A05", "A06", "C03", "E02", "G01", "G04", "G05"));
+
+# add treatment info
+growth.all = inner_join(growth.data.long, plate.map, by = "Well");
+
+growth.all = select(growth.all, Well, Hours, OD600, Strain, Medium, Treatment, Dilution);
+
+return(growth.all)
+}
+
+```
+
+### Functions to normalize OD600 data
+
+Function to normalize OD600 readings by subtracting OD600 at time zero
+
+```{r norm O600 by initial reading}
+
+# Function to normalize OD600 readings by subtracting the OD600 at t=0h
+
+norm_initial = function(growth.cells)
+{
+
+# find first timepoint
+min_time = min(growth.cells$Hours);
+    
+# calc initial OD600
+initial.OD = growth.cells %>%
+  filter(Hours == min_time) %>%
+  rename(OD600_t0 = OD600) %>%
+  select(Well, OD600_t0);
+
+# normalize OD600 by subtracting initial reading
+growth.cells = left_join(growth.cells, initial.OD, by = "Well");
+growth.cells = growth.cells %>%
+  mutate(OD600 = OD600 - OD600_t0) %>%
+  select(-OD600_t0);
+
+return(growth.cells);
+}
+```
+
+Function to normalize OD600 readings by subtracting mean OD600 at the same time point
+
+```{r norm OD by mean reading at the same time}
+
+# substract blank mean from OD measurements
+
+norm_mean = function(growth.blanks, growth.cells)
+{
+# calc mean blank 
+growth.blanks = growth.blanks %>%
+    group_by(Hours)%>%
+        mutate(OD600_blank = mean(OD600)) %>%
+    ungroup;
+
+growth.blanks = growth.blanks %>%
+    select(Hours, OD600_blank) %>%
+    distinct();
+
+# subtract mean blank
+growth.cells = left_join(growth.cells, growth.blanks, by = c("Hours"));
+growth.cells = growth.cells %>%
+    mutate(OD600_norm = OD600 - OD600_blank);
+
+return(growth.cells);
+}
+
+```
+
+Function to run growthcurver
+
+```{r growthcurver}
+
+# function to run Growthcurver analysis.
+# input = data.frame(Hours, Treatment, OD600_mean, OD600_sd)
+# output = 
+
+run_growthcurver = function(growth.treatment)
+{
+    # select cols of interest
+    growth.fit = growth.treatment %>%
+        select(Hours, OD600_mean) %>%
+        rename(time = Hours) %>% # growthcurver requirement
+        mutate(blank = 0);
+
+    # calc growth rate information
+    gc_fit = SummarizeGrowthByPlate(growth.fit, bg_correct = "blank");
+    gc_fit = gc_fit %>%
+        slice(-2); # get rid of blank data
+
+    # components of SummarizeGrowthByPlate object
+    k_maxOD = gc_fit$k;  # carrying capacity
+    n0_minOD = gc_fit$n0; # initial OD600
+    r_intrinsicGrowth = gc_fit$r; # intrinsic growth rate
+    genTime_hours = gc_fit$t_gen; # generation time
+    auc_areaCurve = gc_fit$auc_l; # AUC, integral of logistic eq
+    auc_areaTrapezoid = gc_fit$auc_e; # AUC, area of trapezoid
+    sigma_fit = gc_fit$sigma; # goodnesss of fit 
+    my_note = gc_fit$note; # note if poor fit
+
+    # make data.frame of fit data
+    Treatment = growth.treatment$Treatment[1];
+    fitdata = data.frame(Treatment, 
+                         k_maxOD, 
+                         n0_minOD, 
+                         r_intrinsicGrowth, 
+                         genTime_hours, 
+                         sigma_fit, 
+                         my_note);
+    return(fitdata);
+}
+
+```
+
+# Main
+
+## Organize data
+
+```{r organize data, Select function for plate reader used in this experiment, warning=F}
+
+if (plate_reader == "Clario")
+{
+  growth.all = organize_clario(data.in);
+}
+if (plate_reader == "Bioscreen")
+{
+  growth.all = organize_bioscreen(data.in);
+}
+
+growth.short = head(growth.all, 5);
+table.growth = kable(growth.short, caption = "Table: tidy growth data");
+table.growth
+
+```
+
+## Plots
+
+Plot blanks
+
+```{r Plot blanks, fig.cap = "Fig 1. OD600 of blank treatments (no cells). Each curve is a well."}
+
+growth.blanks = growth.all %>%
+  filter(grepl("Blank", Strain));
+
+plot.blanks = ggplot(growth.blanks, aes(x=Hours, y=OD600, group=Well)) +
+  geom_point(size=1, color = "green") +
+  geom_line(linewidth=0.1, color='black') +
+  theme_bw() +
+  xlab("Hours") + 
+  ylab("OD(600)") +
+  coord_cartesian(
+    xlim = c(0, max(growth.blanks$Hours)), 
+    ylim = c(0, max(growth.blanks$OD600) + 0.2))+
+  facet_wrap (~Treatment, ncol=3)+
+  scale_x_continuous(breaks=seq(0, max(growth.blanks$Hours), 12))+
+  scale_y_continuous(breaks=seq(0, max(growth.blanks$OD600 + 0.1), 0.1))+
+  theme_classic()+
+  mytheme;
+
+grid.arrange(plot.blanks, ncol=1);
+
+```
+
+Normalize OD600 data: subtract blanks from wells with cells.
+
+```{r normalize OD600 readings}
+
+# focus on well with cells
+growth.cells = growth.all %>%
+  filter(!grepl("Blank|Empty", Strain));
+
+if (norm_OD600 == "mean")
+{
+  growth.cells = norm_mean(growth.blanks, growth.cells);
+}
+if (norm_OD600 == "initial")
+{
+  growth.cells = norm_initial(growth.cells);
+}
+
+
+```
+
+Plot growth: for each strain (panel) compare growth in each treatment (lines)
+
+```{r plot Growth, fig.cap = "Fig 2. Growth (OD600) of each strain (panel) in each treatment (curves). Each curve is a well."}
+
+plot.cells = ggplot(growth.cells, aes(x=Hours, y=OD600, group=Well, color=Treatment)) +
+  geom_point(size=.05) +
+  geom_line(linewidth=0.1, color='black') +
+  theme_bw() +
+  xlab("Hours") + 
+  ylab("OD(600)") +
+  coord_cartesian(
+    xlim = c(0, max(growth.cells$Hours)), 
+    ylim = c(-0.05,  max(growth.cells$OD600) + 0.1))+
+  facet_wrap (~Strain, ncol=7)+
+  scale_x_continuous(breaks=seq(0, max(growth.cells$Hours), 24))+
+  scale_y_continuous(breaks=seq(0, max(growth.cells$OD600 + 0.1), 0.4))+
+  scale_color_manual(values = c(color_vals))+
+  theme_classic()+
+  mytheme;
+
+grid.arrange(plot.cells, ncol=1);
+
+
+```
+
+Calculate treatment means for each strain
+
+```{r calc treatment means}
+
+growth.cells = growth.cells %>%
+  group_by(Hours, Treatment, Strain) %>%
+  mutate(OD600_mean = mean(OD600)) %>%
+  mutate(OD600_sd = sd(OD600)) %>%
+ungroup();
+
+```
+
+Plot growth: for each treatment (panel) compare growth of each strain (lines)
+
+```{r plot means foreach strain, fig.cap = "Fig 3. Growth (OD600) of treatments with cells. Plots show strain means (curves) for each treatment (panels)"}
+ 
+plot.cells.means = ggplot(growth.cells, aes(
+    x=Hours, 
+    y=OD600_mean, 
+    group = Strain,
+    ymin = OD600_mean - OD600_sd,
+    ymax = OD600_mean + OD600_sd)) +
+  geom_point(size=.05, color = "blue") +
+  geom_line(linewidth=0.1, color='black') +
+ # geom_errorbar(width = 0, color = "blue")+
+  theme_bw() +
+  xlab("Hours") + 
+  ylab("OD(600)") +
+  coord_cartesian(
+    xlim = c(0, max(growth.cells$Hours)), 
+    ylim = c(-0.05,  max(growth.cells$OD600) + 0.1))+
+  facet_wrap (~Treatment, ncol=7)+
+  scale_x_continuous(breaks=seq(0, max(growth.cells$Hours), 24))+
+  scale_y_continuous(breaks=seq(0, max(growth.cells$OD600 + 0.1), 0.4))+
+  theme_classic()+
+  mytheme;
+
+grid.arrange(plot.cells.means, ncol=1);
+
+```
+
+Plot growth means: for each strain (panel) compare growth in each treatment (lines)
+
+```{r growth compare means, fig.cap="Fig 4. Growth (OD600) of treatments with cells growing in different treatments. Plot shows treatment means (curves) for each strain (panels)."}
+
+plot.cells_strains = ggplot(growth.cells, aes(
+    x=Hours, 
+    y=OD600_mean, 
+    group=Treatment,
+    color=Treatment))+
+    #ymin = OD600_mean - OD600_sd,
+    #ymax = OD600_mean + OD600_sd)) +
+  geom_point(size=.05) +
+  geom_line(linewidth=0.1, color='black') +
+  #geom_errorbar(width = 0, color = "blue")+
+  facet_wrap(~ Strain, ncol=7)+
+  theme_bw() +
+  xlab("Hours") + 
+  ylab("OD(600)") +
+  coord_cartesian(
+    xlim = c(0, max(growth.cells$Hours)), 
+    ylim = c(-0.05,  max(growth.cells$OD600) + 0.1))+
+  scale_x_continuous(breaks=seq(0, max(growth.cells$Hours), 12))+
+  scale_y_continuous(breaks=seq(0, max(growth.cells$OD600 + 0.1), 0.4))+
+  theme_classic()+
+  mytheme;
+
+grid.arrange(plot.cells_strains, ncol=1);
+
+
+
+```
+
+Calc max OD for each strain in each treatment
+
+```{r calc max ODs}
+
+# focus on data of interest
+growth_max = growth.cells %>%
+    dplyr::select(OD600_mean, Strain, Treatment) %>%
+    distinct();
+
+# calc max OD for each strain in each treatment
+growth_max = growth_max %>%
+    group_by(Strain, Treatment) %>%
+        mutate(OD600_max = max(OD600_mean)) %>%
+    ungroup %>%
+    dplyr::select(Strain, Treatment, OD600_max) %>%
+    distinct();
+
+```
+
+Plot max OD: for each strain in each treatment
+
+```{r plot max ODs, warning = F, fig.cap = "Fig 5: max OD600 for each strain in each treatment."}
+
+# remove WT 
+growth_max = growth_max %>%
+    filter(!Strain == "WT");
+
+plot_maxOD = ggplot(growth_max, aes(
+   x = Treatment, 
+   y = OD600_max, 
+   color = Treatment))+
+ geom_boxplot(outlier.size = 0)+
+ geom_jitter(aes(text = Strain), position=position_jitter(0.2))+
+ xlab("Treatment")+
+ ylab("max(OD600)")+
+ coord_cartesian(ylim=c(0, 0.6))+
+ scale_y_continuous(breaks=seq(0, 0.6, 0.1))+
+ scale_color_manual(values = c(color_vals))+
+ theme_classic()+
+ mytheme;
+
+plotly_maxOD = ggplotly(plot_maxOD, tooltip="text");
+plotly_maxOD
+
+```
+
+## Quantify growth rates using growthcurver
+
+Select treatments for growthcurver analysis
+
+```{r select treatments for growthcurver}
+
+growth_gc = growth.cells %>%
+    filter(Strain %in% c("2")) %>%
+    filter(Treatment %in% c("0", "1"));
+
+```
+
+Select log phase growth data for growthcurver
+
+```{r get log phase data}
+
+# data.frame of maxODs for each treatment
+data.maxOD = growth_gc %>%
+    group_by(Treatment) %>%
+        mutate(maxOD = max(OD600_mean)) %>%
+        filter(OD600_mean == maxOD) %>%
+    ungroup;
+
+# filter for first time OD reaches max OD
+data.maxOD = data.maxOD %>%
+    group_by(Treatment) %>%
+        arrange(Hours) %>%
+        filter(row_number()==1) %>%
+    ungroup() %>%
+    mutate(time_maxOD = Hours) %>%
+    select(Treatment, time_maxOD);
+
+growth.cells.means.log = left_join(growth_gc, data.maxOD, by = "Treatment");
+
+# filter for data in log phase
+growth.cells.means.log = growth.cells.means.log %>%
+    filter(Hours < (time_maxOD + 3)) %>%
+    select(Hours, Treatment, OD600_mean);
+
+```
+
+Run growthcuver
+
+```{r growthcurver calculations}
+
+# get list of treatments/strains
+treatments = unique(growth.cells.means.log$Treatment);
+
+# declare empty data.frame for fit data
+fit.data.all = data.frame(Treatment = character(),
+                      k_maxOD = double(),
+                      n0_minOD = double(),
+                      r_intrinsicGrowth = double(),
+                      genTime_hours = double(),
+                      sigma_fit = double(),
+                      my_note = character());
+
+# run growthcurver on each treatment/strain
+for (my.treatment in treatments)
+{
+    data.fit = growth.cells.means.log %>%
+        filter(Treatment == my.treatment);
+    fit.data = run_growthcurver(data.fit);
+    fit.data.all = rbind(fit.data.all, fit.data);
+}
+  
+# add fit data to growthdata
+growth.cells.fit = left_join(growth.cells.means.log,
+                             fit.data.all,
+                             by="Treatment");
+
+growth.cells.fit = growth.cells.fit %>%
+    mutate(my_fit = k_maxOD / (1 + (((k_maxOD - n0_minOD) / n0_minOD) * exp(1)^-(r_intrinsicGrowth * Hours))));
+
+```
+
+Plot growthcurver data
+
+```{r plot Growthcurver, fig.cap = "Fig. Growth plots for each treatment. Treatment names are shown above plot. Black curves shows mean OD600; red curves show Growthcurver fit."}
+
+# subsample data for plotting
+growth.cells.fit.plot = growth.cells.fit %>%
+    filter(round(Hours, 2) %% 2 ==0);
+
+fitplots = ggplot(growth.cells.fit.plot, aes(x=Hours, 
+                                           y=OD600_mean))+
+    facet_wrap(~Treatment)+
+    #geom_line(size=0.2, color='black') +
+    geom_point(size=1) +
+    geom_line(aes(x=Hours, y=my_fit, color = 'red'))+
+    xlab("time") + ylab("OD(600)")+
+    coord_cartesian(
+        xlim = c(0, 40), 
+        ylim = c(0, 0.6))+
+    theme_classic()+
+    mytheme;
+
+fitplots
+
+```
+
+Table of growthcurver data
+
+```{r Table growthcurver}
+
+growth.cells.fit.table = growth.cells.fit %>%
+    select(Treatment, k_maxOD, r_intrinsicGrowth, genTime_hours, sigma_fit) %>%
+    mutate(k_maxOD = round(k_maxOD, 2)) %>%
+    mutate(genTime_hours = round(genTime_hours, 2)) %>%
+    mutate(r_intrinsicGrowth = round(r_intrinsicGrowth, 2)) %>%
+    mutate(sigma_fit = round(sigma_fit, 2)) %>%
+    distinct();
+  
+table1 = kable(growth.cells.fit.table, caption = "Growth curve data for each treatment. ");
+table1
+```
+
+# Conclusions
