@@ -21,14 +21,15 @@ These excel files have two pages:
 
 ## Methods for growth analysis
 
+This [code](Code/plotGrowth_means.qmd) and [Quarto notebook](Code/plotGrowth_means.html) shows how to visualize and analyze growth curves.
+
 ### Plot growth curves
-This [code](Code/plotGrowth_means.qmd) and [Quarto notebook](Code/plotGrowth_means.html) shows how to visualize growth curves in three steps. 
 
 The code can be adapted as follows:
 1. Select input format: Clario or Bioscreen
 2. Select normalizaton method: Growth measurements can be normalized by subtracting blank from all measurements or setting initial reading to zero.
 
-Outputs:
+Growth curve plots:
 1. Plot OD600 in blanks
 2. Plot growth in each well.
 3. Plot treatments means +/-SD.
@@ -36,6 +37,4 @@ Outputs:
 
 ### Calculate growth parameters
 In addition to visualizing the growth curves for different treatments, it is also useful to calculate growth paramaters (e.g. intrinsic growth rate, generation time, carrying capacity). The Growthcurver R package as described [here](Logistic_Fit/2024.02_growthcurver.md) calculates parameters for growth curves by performing a logistic fit.
-
-This [code](Code/growthCurver_plotGrowth_means_Bioscreen.qmd) shows how to calculate growth parameters using GrowthCurver.
 
