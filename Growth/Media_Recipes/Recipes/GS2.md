@@ -14,7 +14,7 @@ Table I
 |       K2HPO4        |       2.9       |                P3786 |
 |        Urea         |       2.1       |                U0631 |
 |   L-cysteine-HCl    |        2        |                C6852 |
-|        MOPS         |       10        |                M3183 |
+|        MOPS         |        2        |                M3183 |
 | Sodium citrate 2H2O |        3        |                S4641 |
 |    Yeast extract    |        6        |                Y1625 |
 
