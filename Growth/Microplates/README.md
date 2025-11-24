@@ -21,7 +21,7 @@ These excel files have two pages:
 
 ## Methods for growth analysis
 
-This [code](Code/plotGrowth_means.qmd) and [Quarto notebook](Code/plotGrowth_means.html) shows how to visualize and analyze growth curves.
+This [code](Code/growth_means_growthcurver.qmd) and [Quarto notebook](Code/growth_means_growthcurver.html) shows how to visualize and analyze growth curves.
 
 ### Plot growth curves
 
