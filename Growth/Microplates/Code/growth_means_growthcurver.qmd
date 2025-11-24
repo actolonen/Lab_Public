@@ -1,5 +1,5 @@
 ---
-title: "Analyze growth experiment"
+title: "Analyze microplate growth experiment"
 author: "Fermlab"
 format: html
 editor: visual
@@ -178,7 +178,37 @@ return(growth.all)
 
 ### Functions to normalize OD600 data
 
-Function to normalize OD600 readings by subtracting OD600 at time zero
+Function to normalize OD600 readings by subtracting mean OD600 of blank medium at the same time point.
+
+NOTE: The cells and the blanks must have the same "medium" for the subtraction to work correctly.
+
+```{r norm OD by mean reading at the same time}
+
+# substract blank mean from OD measurements
+
+norm_mean = function(growth.blanks, growth.cells)
+{
+# calc mean blank 
+growth.blanks = growth.blanks %>%
+    group_by(Medium, Hours)%>%
+        mutate(OD600_blank = mean(OD600)) %>%
+    ungroup;
+
+growth.blanks = growth.blanks %>%
+    select(Hours, Medium, OD600_blank) %>%
+    distinct();
+
+# subtract mean blank
+growth.cells = left_join(growth.cells, growth.blanks, by = c("Medium", "Hours"));
+growth.cells = growth.cells %>%
+    mutate(OD600_norm = OD600 - OD600_blank);
+
+return(growth.cells);
+}
+
+```
+
+Function to normalize OD600 readings by subtracting OD600 at time zero. Normalization is on a well-by-well basis.
 
 ```{r norm O600 by initial reading}
 
@@ -201,33 +231,6 @@ growth.cells = left_join(growth.cells, initial.OD, by = "Well");
 growth.cells = growth.cells %>%
   mutate(OD600 = OD600 - OD600_t0) %>%
   select(-OD600_t0);
-
-return(growth.cells);
-}
-```
-
-Function to normalize OD600 readings by subtracting mean OD600 at the same time point
-
-```{r norm OD by mean reading at the same time}
-
-# substract blank mean from OD measurements
-
-norm_mean = function(growth.blanks, growth.cells)
-{
-# calc mean blank 
-growth.blanks = growth.blanks %>%
-    group_by(Hours)%>%
-        mutate(OD600_blank = mean(OD600)) %>%
-    ungroup;
-
-growth.blanks = growth.blanks %>%
-    select(Hours, OD600_blank) %>%
-    distinct();
-
-# subtract mean blank
-growth.cells = left_join(growth.cells, growth.blanks, by = c("Hours"));
-growth.cells = growth.cells %>%
-    mutate(OD600_norm = OD600 - OD600_blank);
 
 return(growth.cells);
 }
@@ -307,7 +310,7 @@ Plot blanks
 ```{r Plot blanks, fig.cap = "Fig 1. OD600 of blank treatments (no cells). Each curve is a well."}
 
 growth.blanks = growth.all %>%
-  filter(grepl("Blank", Strain));
+  filter(grepl("[Bb]lank", Strain));
 
 plot.blanks = ggplot(growth.blanks, aes(x=Hours, y=OD600, group=Well)) +
   geom_point(size=1, color = "green") +
@@ -318,7 +321,7 @@ plot.blanks = ggplot(growth.blanks, aes(x=Hours, y=OD600, group=Well)) +
   coord_cartesian(
     xlim = c(0, max(growth.blanks$Hours)), 
     ylim = c(0, max(growth.blanks$OD600) + 0.2))+
-  facet_wrap (~Treatment, ncol=3)+
+  facet_wrap (~Medium, ncol=3)+
   scale_x_continuous(breaks=seq(0, max(growth.blanks$Hours), 12))+
   scale_y_continuous(breaks=seq(0, max(growth.blanks$OD600 + 0.1), 0.1))+
   theme_classic()+
@@ -328,23 +331,29 @@ grid.arrange(plot.blanks, ncol=1);
 
 ```
 
+Remove contaminated wells from blanks measurements
+
+```{r remove cotnaminated wells from blanks}
+
+growth.blanks = growth.blanks;
+
+```
+
 Normalize OD600 data: subtract blanks from wells with cells.
 
 ```{r normalize OD600 readings}
 
 # focus on well with cells
 growth.cells = growth.all %>%
-  filter(!grepl("Blank|Empty", Strain));
+  filter(!grepl("[Bb]lank|[Ee]mpty", Strain));
 
-if (norm_OD600 == "mean")
-{
-  growth.cells = norm_mean(growth.blanks, growth.cells);
-}
-if (norm_OD600 == "initial")
-{
-  growth.cells = norm_initial(growth.cells);
-}
+# Step 1: subtract blanks from each treatment
+growth.cells = norm_mean(growth.blanks, growth.cells);
 
+# Step 2: set time zero to OD600 = 0
+growth.cells = norm_initial(growth.cells);
+  
+}
 
 ```
 
