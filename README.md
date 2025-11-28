@@ -1,5 +1,8 @@
+# General utilities
+[API_requests](API_requests) Code to request data from APIs used in various projects.
+
 # Analysis_Lab
-This repo is a collection of methods we use in lab to study the physiology, metabolisms, and genetics of microorganisms. It is organized into 5 project areas:
+This repo is a collection of methods we use in lab to study the physiology, metabolisms, and genetics of microorganisms. It is organized into these project areas:
 
 1. [Growth](Growth) of cells in microplates, culture tubes, and fermenters.
 2. [DNA sequence analysis](DNA_Sequences) of genomes.
