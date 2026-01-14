@@ -24,6 +24,8 @@
 * reduce medium with nitrogen bubbling
 * Add 2g cysteine HCl
 
+**Carbon source
+* Glucose is added at 60 g/L
 
 **Filter sterilize**
 
