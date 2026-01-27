@@ -1,0 +1,101 @@
+---
+title: "Example of hypergeometric test using phyper"
+author: "Andrew Tolonen"
+format: html
+editor: visual
+toc: TRUE
+code-fold: TRUE
+embed-resources: TRUE
+---
+
+# Introduction
+
+# Setup
+
+Libraries
+
+```{r Libraries, message = F}
+
+# libraries to include
+library(tidyverse);
+
+```
+
+Flags/Config
+
+```{r flags and config}
+
+rm(list = ls());
+
+```
+
+File IO
+
+```{r file IO}
+
+# input data: df with rows for each gene. col 1 = cluster, col 2 = COG
+data_in = read.table("/home/tolonen/Github/actolonen/Public/Lab_Public/Gene_Expression/Cluster_enrichment/cluster_data_test.tsv", header = T);
+
+```
+
+# Main
+
+Run hypergeometric test on data set.
+
+phyper(q, m, n, k, lower.tail)
+
+q = number of genes in cluster belonging to target COG
+
+m = genes in target COG
+
+n = genes not in target COG in cluster
+
+k = total genes in cluster
+
+```{r phyper example}
+
+# replace NA with "none"
+data_long = data_in %>%
+    mutate(across(everything(), ~ replace_na(.x, "none"))) %>%
+    mutate(COG = if_else(COG == "nan", true = "none", false = COG));
+    
+# 1. Create a contingency table of counts
+# Rows = Functional Categories, Columns = Clusters
+counts_table = table(data_long$COG, data_long$Cluster);
+
+total_genes = nrow(data_in);
+genes_per_cog = rowSums(counts_table)  # m
+genes_per_cluster = colSums(counts_table) # k
+
+# 3. Run the enrichment tests
+results = expand.grid(
+  Category = rownames(counts_table),
+  Cluster = colnames(counts_table),
+  stringsAsFactors = FALSE);
+
+results = results %>%
+  mutate(
+    hits = mapply(function(cat, clus) counts_table[cat, clus], Category, Cluster),
+    m = genes_per_cog[Category],
+    n = total_genes - m,
+    k = genes_per_cluster[Cluster],
+    # We use hits - 1 because lower.tail = FALSE calculates P(X > q)
+    p_value = phyper(hits - 1, m, n, k, lower.tail = FALSE)
+  )
+
+hits = results %>%
+      filter(p_value < 0.05);
+
+```
+
+Correct for multiple hypothesis testing
+
+```{r correct multiple hypotheses}
+
+# 4. CRITICAL: Adjust for multiple testing
+hits_corrected = results %>%
+  mutate(p_adj = p.adjust(p_value, method = "BH")) %>%
+#  filter(p_adj < 0.05) %>%
+  arrange(p_adj)
+
+```
