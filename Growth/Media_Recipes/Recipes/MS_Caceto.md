@@ -9,14 +9,15 @@
 * Filter sterilize
 
 **Prepare 1 liter of MS medium**
-* 0.5g KH2PO4
+* 0.55g KH2PO4
+  * Can make stock Solution and store at room temp = 93.75 g/L
 * 0.5 g K2HP04 - 3H20
-* 0.2 g MgSO4 * 7H20
+  * Can make stock Solution and store at room temp = 93.75 g/L
+* 0.22 g MgSO4 * 7H20
 * 0.01g MnSO4 * 1H20
-* 0.01 g FeSO4 * 7H20
+* 0.011 g FeSO4 * 7H20
 * 0.01 g NaCl
 * 2.2 g ammonium chloride
-* 20 g glucose
 * dilute to 900 ml with water
 * 1 ml of 1000x vitamin solution
 * Adjust to pH 6
@@ -24,6 +25,8 @@
 * reduce medium with nitrogen bubbling
 * Add 2g cysteine HCl
 
+**Carbon source**
+* Glucose is added at 60 g/L
 
 **Filter sterilize**
 

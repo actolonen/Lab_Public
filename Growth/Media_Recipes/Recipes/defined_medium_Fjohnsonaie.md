@@ -22,7 +22,7 @@ Composition of SD medium from [Chang and Pate, 1981](https://link.springer.com/a
 
 ## Prepare 1M phosphate buffer pH 7.25 (50x solution) [Reference](https://www.novoprolabs.com/tools/buffer-preparations-and-recipes/sodium-phosphate-buffer)
 
-1. Prepare 0.8 L of distilled water in a suitable container.
+1. Prepare 0.8 L of deionized water in a suitable container.
 2. Add 41.188 g of Sodium dihydrogen phosphate to the solution.
 3. Add 93.225 g of Sodium phosphate dibasic to the solution.
 4. Add distilled water until the volume is 1 L.
