@@ -17,7 +17,7 @@ Here is an image of the Shimadzu HPLC at the Genoscope-CEA
 ## Experimental procedure
 
 -   Here is [Tom's protocol](Protocols/2024.09_protocolHPLC.pdf) to run the HPLC.
--   Here is [Magali's protocol](Protocols/2024.10_protocole_HPLC_MB.docx) to run the HPLC.
+-   Here is [Magali's protocol](Protocols/protocol_HPLC_MB.docx) to run the HPLC.
 
 ## HPLC Troubleshooting
 
