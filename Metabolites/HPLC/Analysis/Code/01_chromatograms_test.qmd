@@ -12,6 +12,15 @@ embed-resources: TRUE
 
 This code extracts HPLC chromatograms from LCD files and outputs the chromatogram data as TXT files and plots the data as a PNG file.
 
+chromConverter installation using a micromamba environment:
+
+1.  Activate micromamba environment
+2.  micromamba install r-remotes
+3.  activate R
+4.  confirm micromamba R is running:
+    1.  R.home('bin')
+5.  Install chromConverter: remotes::install_github("[https://github.com/ethanbass/chromConverter/")](https://github.com/ethanbass/chromConverter/"))
+
 # Setup
 
 Libraries

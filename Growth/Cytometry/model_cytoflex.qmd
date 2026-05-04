@@ -1,0 +1,350 @@
+---
+title: ""
+author: "Andrew Tolonen"
+format: html
+editor: visual
+toc: TRUE
+code-fold: TRUE
+embed-resources: TRUE
+---
+
+# Introduction
+
+This notebook describes methods to visualize and filter flow cytometry data in .FCS files using the R flowCore package. Data was acquired using a Beckman CytoFlex instrument. Here, the samples are SYBR-stained bacterial cells. The goal is to accurately enumerate the number of bacteria in a defined volume.
+
+## Background
+
+FCS files contain all acquired data. However, running Cytoflex requires 3 user-defined settings that affect what data is acquired:
+
+-   Threshold = min signal for event, should set min signal manually.
+
+-   Gain (hand signal on Cytoflex software). Note, the abort rate goes up if gain is too high.
+
+-   Width = Set a width threshold, but other users stay with the default.
+
+Also, the software asks the user to calculate number of events to save. This can be total events or total time. We defined a 20-30 sec of acquisition period with a flow rate of 10 ul per min. Thus, the sample volume was 3.33 ul.
+
+# Setup
+
+Libraries
+
+```{r Libraries, message = F}
+
+# libraries to include
+library(knitr);
+library(tidyverse);
+library(readxl);
+library(readr);
+library(gridExtra);
+library(ggpubr);
+library(glue);
+
+library(flowCore);
+library(ggcyto);
+library(lattice);
+
+```
+
+Flags/Config
+
+```{r flags and config}
+
+rm(list = ls());
+
+mytheme = theme(axis.text.x = element_text(size = 8), 
+                axis.text.y = element_text(size = 8), 
+                axis.title.x = element_blank(), 
+                axis.title.y = element_text(size = 8),
+                strip.text.x = element_text(size = 8),
+                strip.text.y = element_text(size = 8),
+                legend.position = "none", 
+                aspect.ratio = 0.25,
+                plot.title = element_text(size = 8),
+               );
+
+# dilution factor of sample
+dilution_factor = 4;
+
+```
+
+File IO
+
+Note: I am not truncating the data even though some channels exceed the max \$PnR value
+
+```{r File IO}
+
+path_in = "/home/tolonen/Drives/Genoscope-googledrive/LabGroup_Shared/Lab_Projects/Flavobacterium/Cytometry/2026.04.15_Biostat_Wheatbran/FCS_files/";
+file_in = "flavo_son_ble_F1_T1_1j__X4.fcs";
+data_in = paste0(path_in, file_in);
+data_1 = read.FCS(data_in, truncate_max_range = F);
+
+```
+
+# Main
+
+Input data (data_1) is a flowFrame object with 3 slots
+
+1.  exprs = matrix of events x channels
+2.  parameters = AnnotatedDataFrame of meta data
+3.  description = list of header info
+
+```{r examine data}
+
+# data summary
+my_sum = summary(data_1);
+
+# summary of measurements for each channel
+total_events <- nrow(data_1)
+cat("The total number of events acquired is:", total_events, "\n");
+
+# summary of parameters
+params = pData(parameters(data_1));
+params <- as_tibble(params);
+table = kable(params, caption = "Table: Acquired parameters. The range column describes the max value for each channel.");
+table
+
+```
+
+Define the volume analyzed
+
+```{r define volume analyzed}
+
+kw = keyword(data_1);
+vol_nl =  as.numeric(kw["$VOL"]);
+vol_ml = vol_nl/1e6;
+
+```
+
+### Visualize data
+
+Plot FSC vs SSC on linear scale
+
+```{r plot on linear scale, warning = F, fig.cap = "Fig: FSC-A vs SSC-A on linear scale."}
+
+# untransformed
+plot_1 = autoplot(data_1, "FSC-A", "SSC-A") + 
+         theme_minimal() + 
+         labs(x = "FSC-A", y = "SSC-A");
+plot_1
+
+```
+
+Plot on FSC vs SSC on log scale
+
+```{r plot on log scale, fig.cap = "Fig: FSC-A vs SSC-A on log scale.", warning = F}
+
+# log-transformed
+plot_2 = autoplot(data_1, "FSC-A", "SSC-A") + 
+    coord_cartesian(xlim = c(1, 100000), 
+                    ylim = c(1, 100000))+
+  scale_x_log10() + 
+  scale_y_log10() + 
+  labs(x = "FSC-A", y = "SSC-A")+
+  theme_minimal();
+
+plot_2
+
+```
+
+Plot FL1-A vs FL1-H to look for aggregates
+
+```{r plot SYBR signal H vs A, fig.cap = "Fig: Plot of SYBR signal (FL1) area vs height. Single cells should appear on the diagononal, whereas cell aggregates are elsewhere."}
+
+# log-transformed
+plot_2a = autoplot(data_1, "FL1-H", "FL1-A") + 
+    # coord_cartesian(xlim = c(1, 1e8), 
+    #                 ylim = c(1, 1e8))+
+  scale_x_log10() + 
+  scale_y_log10() + 
+  labs(x = "FL1-H", y = "FL1-A")+
+  theme_minimal();
+
+plot_2a
+
+```
+
+Univariate plot of SYBR fluorescence
+
+```{r univariate log SYBR fluorescence, fig.cap = "Fig: Univariate plot of SYBR fluorescence on log scale.", warning = F}
+
+plot_2b = autoplot(data_1, "FL1-A") + 
+  scale_x_log10() + 
+  theme_minimal()+
+  labs(x = "FL1-A", y = "Density")+
+  mytheme;
+plot_2b
+
+```
+
+Logicle transform SYBR fluorescence
+
+```{r logicle transform SYBR signal}
+
+# Define the channels to transform
+channels_to_transform <- c("FL1-H", "FL1-A");
+
+# Estimate the logicle transformation parameters from your data
+trans_list = estimateLogicle(data_1, channels_to_transform, m = 7);
+
+# Apply the transformation to the flowFrame
+data_1_transformed <- transform(data_1, trans_list);
+
+```
+
+Univariate density plot of logicle-transformed SYBR fluorescence
+
+```{r time plot, fig.cap = "Fig: Logicle-transformed SSC_1-A signal."}
+
+plot_3 = autoplot(data_1_transformed, "FL1-H") +   
+  theme_minimal()+
+  mytheme;
+plot_3
+
+```
+
+Bivariate plot of logicle-transformed SYBR fluorescence
+
+```{r bivariant SYBR fluorescence, fig.cap = "Fig: Bivariate plot of logicle transformed violet signal."}
+
+# log-transformed
+plot_4 = autoplot(data_1_transformed, "FL1-H", "FL1-A") + 
+  theme_minimal();
+
+plot_4
+
+```
+
+### Apply gates to filter data
+
+Apply gate to remove lower peak of SYBR fluorescence
+
+```{r violet gate, fig.cap = "Fig: plot of FL1-A data after gate to remove small events"}
+
+# define gate bounds
+gate_bounds <- list("FL1-A" = c(4.5, 5.5));
+
+# define gate object
+my_gate <- rectangleGate(filterId = "test gate", 
+                         .gate = gate_bounds);
+
+# apply gate
+gate1_result <- filter(data_1_transformed, my_gate);
+print(summary(gate1_result));
+
+# subset gated data
+data_gated_1 = Subset(data_1_transformed, my_gate);
+
+# log-transformed
+plot_5 = autoplot(data_gated_1, "FL1-A") +   
+  theme_minimal()+
+  mytheme;
+plot_5
+
+```
+
+Replot gated FSC-A vs SSC-A
+
+```{r replot gated data, warning = F, fig.cap = "Fig: FSC-A vs SSC-A after gate to remove small events."}
+
+# log-transformed
+plot_5b = autoplot(data_gated_1, "FSC-A", "SSC-A") + 
+    coord_cartesian(xlim = c(10, 1000000), 
+                    ylim = c(10, 1000000))+
+  scale_x_log10() + 
+  scale_y_log10() + 
+  theme_minimal();
+
+plot_5b
+
+
+```
+
+Apply rectangular gate to FSC-A, SSC-A
+
+```{r gate FSC-A, fig.cap = "Fig: Rectanglular gate applied to FSC-A vs SSC-A after gate to remove small events.", warning = F}
+
+# define gate bounds
+gate_bounds <- list("FSC-A" = c(10, 50000), 
+                    "SSC-A" = c(100, 100000))
+
+# define gate object
+my_gate <- rectangleGate(filterId = "rectangle gate", 
+                         .gate = gate_bounds);
+
+# apply gate
+gate_result_r <- filter(data_1_transformed, my_gate);
+print(summary(gate_result_r));
+
+# subset data
+data_gated_r = Subset(data_gated_1, my_gate);
+
+# log-transformed
+plot_5 = autoplot(data_gated_r, "FSC-A", "SSC-A") + 
+    coord_cartesian(xlim = c(10, 1e6), 
+                    ylim = c(10, 1e6))+
+  scale_x_log10() + 
+  scale_y_log10() + 
+  theme_minimal();
+
+plot_5
+
+
+```
+
+Apply polygon gate to FSC-A, SSC-A
+
+```{r apply polygon gate, fig.cap = "Fig: Polygon gate applied to FSC-A vs SSC-A data.", eval = F}
+
+# Define the coordinates for the polygon gate
+polygon_coords <- matrix(c(100, 200, 
+                           10, 5000, 
+                           500, 70000,
+                           30000, 70000,
+                           30000, 200), 
+                         ncol = 2, 
+                         byrow = T,
+                         dimnames = list(NULL, c("FSC-A", "SSC-A")));
+
+
+# Create the gate object. 'polygonGate' converts the coordinates into an actual gated region 
+# that flowCore can interpret.
+poly_gate <- polygonGate(filterId = "MyPolygonGate", .gate = polygon_coords);
+
+#xyplot(`SSC-A` ~ `FSC-A`, data = data_gated_1, filter = poly_gate);
+
+# Apply the gate to the data. The 'filter' function checks every event 
+# (cell) in 'data_1' to see if it falls inside the defined polygon.
+gate_result_p <- filter(data_gated_1, poly_gate);
+print(summary(gate_result_p));
+
+# Extract the subset. 'Subset' creates a new object containing 
+data_gated_p <- Subset(data_gated_1, gate_result_p);
+
+# log-transformed
+plot_6 = autoplot(data_gated_p, "FSC-A", "SSC-A") + 
+    coord_cartesian(xlim = c(1, 70000), 
+                    ylim = c(1, 70000))+
+  scale_x_log10() + 
+  scale_y_log10() + 
+  theme_minimal();
+
+plot_6
+
+```
+
+### Calculate the cell density (events / ml)
+
+Calculate number of cells per ml
+
+```{r calc cells per ml}
+
+# 1. Get the number of events in your filtered data
+n_events <- nrow(data_gated_r);
+
+# Calculate concentration
+concentration = dilution_factor * (n_events / vol_ml);
+conc_sci = format(concentration, scientific = TRUE, digits = 3);
+
+cat("The concentration is", conc_sci, "cells/mL\n")
+
+```
