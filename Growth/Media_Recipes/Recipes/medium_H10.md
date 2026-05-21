@@ -16,9 +16,9 @@
     -   Filter sterilize (0.2 uM)
     -   Store at 4C
 
--   0.1% resazurin (Sigma R7017) solution (1000x)
+-   0.1% resazurin solution (1000x)
 
-    -   Dilute 10 mg of resazurin in 10 ml water
+    -   Dilute 10 mg of resazurin (Sigma R7017) in 10 ml water
     -   Filter sterilize (0.2 uM)
     -   Store at 4C
 
