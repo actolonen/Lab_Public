@@ -9,11 +9,15 @@
 
 -   [MS, MA, M9 defined media](Recipes/2024.02_mediaRecipes_MS-MA-M9.pdf)
 
-## Clostridium acetobutylicum medium
+## *Clostridium acetobutylicum* medium
 
 -   [YTG medium](Recipes/YTG.md)
 -   [CGM medium](Recipes/CGM.md)
 -   [MS medium](Recipes/MS_Caceto.md)
+
+## *Ruminoclostridium cellulolyticum* medium
+
+-   [H10 medium](Recipes/medium_H10.md)
 
 ## *Flavobacterium johnsonaie* media
 
