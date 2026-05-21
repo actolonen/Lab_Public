@@ -2,9 +2,9 @@
 
 ## Prepare stock solutions
 
--   0.5% (5 g/L) iron sulfate (Sigma F6833) solution (40X)
+-   0.5% (5 g/L) iron sulfate solution (40X)
 
-    -   Dilute 1 g iron sulfate in 200 ml of water
+    -   Dilute 1 g iron sulfate (Sigma F6833) in 200 ml of water
 
     -   Autoclave
 
@@ -12,7 +12,7 @@
 
 -   20 % (200 g/L) cellobiose solution (40x)
 
-    -   Dilute 6 g cellobiose in 30 ml water
+    -   Dilute 6 g cellobiose (Sigma 22150) in 30 ml water
     -   Filter sterilize (0.2 uM)
     -   Store at 4C
 
@@ -44,7 +44,7 @@
 |            MOPS            |   78 mM (18 g/L)    |
 |           KH2PO4           |   8 mM (2.17 g/L)   |
 |       Yeast extract        |        2 g/L        |
-|       L-cysteine HCl       |       0.5 g/L       |
+|       L-cysteine HCl       |        2 g/L        |
 | Resazurin solution (1000x) |   1 ml per liter    |
 |  Mineral solution (100x)   |   10 ml per liter   |
 
