@@ -10,7 +10,7 @@
 
     -   Store at 4C
 
--   20 % (200 g/L) cellobiose solution (100x)
+-   20 % (200 g/L) cellobiose solution (40x)
 
     -   Dilute 6 g cellobiose in 30 ml water
     -   Filter sterilize (0.2 uM)
@@ -50,6 +50,8 @@
 
 -   Autoclave base medium
 
--   Add 10 ml of cellobiose solution per liter of base medium
+-   Add 25 ml of cellobiose solution (40x) per liter of base medium (5 g/L final concentration)
+
+    -   NOTE: we use 5 g/L cellobiose for bench experiments and 2 g/L cellobiose for Genemat evolutions
 
 #
