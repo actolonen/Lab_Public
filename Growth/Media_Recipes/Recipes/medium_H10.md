@@ -2,24 +2,15 @@
 
 ## Prepare stock solutions
 
--   0.5% (5 g/L) iron sulfate solution (40X)
+-   10% (100 g/L) cellobiose solution (20x)
 
-    -   Dilute 1 g iron sulfate (Sigma F6833) in 200 ml of water
-
-    -   Autoclave
-
-    -   Store at 4C
-
--   20 % (200 g/L) cellobiose solution (40x)
-
-    -   Dilute 6 g cellobiose (Sigma 22150) in 30 ml water
+    -   Dilute 5 g cellobiose (Sigma 22150) in 50 ml water
     -   Filter sterilize (0.2 uM)
     -   Store at 4C
 
 -   0.1% resazurin solution (1000x)
 
     -   Dilute 10 mg of resazurin (Sigma R7017) in 10 ml water
-    -   Filter sterilize (0.2 uM)
     -   Store at 4C
 
 -   Mineral solution (100x)
@@ -28,14 +19,14 @@
 
     -   Autoclave mineral solution
 
-    -   Store at 4C
+    -   Store at room temperature
 
 |          Compound           |   Formula   | Final concentration |
 |:---------------------------:|:-----------:|:-------------------:|
 |      Ammonium sulfate       | (NH4)2\*SO4 |       130 g/L       |
 |     Magnesium chloride      | MgCl2\*6H2O |       10 g/L        |
 |      Calcium chloride       | CaCl2\*2H2O |        2 g/L        |
-| Iron sulfate solution (40x) | FeSO4\*7H2O |       25 ml/L       |
+| Iron sulfate solution (40x) | FeSO4\*7H2O |      0.125 g/L      |
 
 ## Prepare base medium
 
@@ -48,9 +39,11 @@
 | Resazurin solution (1000x) |   1 ml per liter    |
 |  Mineral solution (100x)   |   10 ml per liter   |
 
+-   Adjust pH to 7.3 (add \~16.5 ml 6N potassium hydroxide)
+
 -   Autoclave base medium
 
--   Add 25 ml of cellobiose solution (40x) per liter of base medium (5 g/L final concentration)
+-   Add 50 ml of cellobiose solution (20x) per liter of base medium (5 g/L final concentration)
 
     -   NOTE: we use 5 g/L cellobiose for bench experiments and 2 g/L cellobiose for Genemat evolutions
 
