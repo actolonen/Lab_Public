@@ -32,3 +32,7 @@
 ## *Yarrowia lipolytica* media
 
 -   [YNB medium](Recipes/recipe_YNB.md)
+
+## *Phaeodactylum tricornutum* media
+
+-   [F2 medium](Recipes/medium_F2.pdf)
