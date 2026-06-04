@@ -1,5 +1,5 @@
 ---
-title: "Analyze microplate growth experiment"
+title: "Microbial growth in microplates"
 author: "Fermlab"
 format: html
 editor: visual
@@ -10,7 +10,7 @@ embed-resources: TRUE
 
 # Introduction
 
-Description of growth experiment.
+Code to organize, plot, and analyze microbial growth in microplates measured with either a Bioscreen or Clario star instrument.
 
 # Setup
 
@@ -49,10 +49,8 @@ mytheme = theme(axis.text.x = element_text(size = 6),
                axis.title.y = element_text(size = 6),
                strip.text.x = element_text(size = 6),
                legend.position = "bottom", 
-               legend.text = element_text(size=4),
+               legend.text = element_text(size=6),
                aspect.ratio =0.5);
-
-color_vals = c("0" = "#BEBEBE", "1.5"="#68A2AD", "2"="#EEBC37");
 
 ```
 
@@ -61,8 +59,8 @@ File IO
 ```{r File IO}
 
 # input data
-file.in = "growthData_Bioscreen.xlsx";
-path.in = "/home/tolonen/Github/actolonen/Public/Lab_Public/Growth/Microplates/Data";
+file.in = "";
+path.in = "";
 data.in = paste(path.in, file.in, sep = "/");
 
 ```
@@ -87,42 +85,42 @@ Function to organize Clario data
 
 organize_clario = function(data.in)
 {                              
-# output is data.frame = [Hours, Well, OD600, Treatment]
-
-plate.map = read_excel(data.in, sheet = "Informations", col_names = TRUE, skip = 3);
-growth.data = read_excel(data.in, sheet = "Raw data", col_names = TRUE, skip = 0);
-
-# plate map variables
-first.well = "A01";
-last.well = "H12";
-
-# parse plate.map
-plate.map = plate.map %>%
-  filter(!Treatment == "Empty");
-  
-# parse growth.data
-growth.data.long = growth.data %>%
-  select(-Well) %>%
-  rename("Time" = "...2") %>%
-  slice(-1) %>% # delete first row
-  slice(-1) %>%
-  mutate(Time = if_else(grepl("min", Time), true = Time, false =  paste(Time, "0 min", sep = " "))) %>%  
-# add minutes field where lacking
-  separate(Time, c("my.hours", "hours.label", "my.min", "min.label"), sep = " ") %>%
-  mutate(Hours = as.numeric(my.hours) + as.numeric(my.min)/60) %>%
-  #mutate(Seconds = as.numeric(Seconds)) %>%
-  #mutate(Hours = Seconds/3600) %>%
-  dplyr::select(Hours, first.well:last.well) %>%
-  pivot_longer(cols = first.well:last.well, names_to = "Well", values_to = "OD600");
-growth.data.long$OD600 = as.numeric(growth.data.long$OD600);
-
-# add treatment info
-growth.all = inner_join(growth.data.long, plate.map, by = "Well");
-
-growth.all = growth.all %>%
-    select(Well, Hours, OD600, Strain, Medium, Treatment, Dilution)
-
-return(growth.all)
+    # output is data.frame = [Hours, Well, OD600, Treatment]
+    
+    plate.map = read_excel(data.in, sheet = "Informations", col_names = TRUE, skip = 3);
+    growth.data = read_excel(data.in, sheet = "Raw data", col_names = TRUE, skip = 0);
+    
+    # plate map variables
+    first.well = "A01";
+    last.well = "H12";
+    
+    # parse plate.map
+    plate.map = plate.map %>%
+      filter(!Treatment == "Empty");
+      
+    # parse growth.data
+    growth.data.long = growth.data %>%
+      select(-Well) %>%
+      rename("Time" = "...2") %>%
+      slice(-1) %>% # delete first row
+      slice(-1) %>%
+      mutate(Time = if_else(grepl("min", Time), true = Time, false =  paste(Time, "0 min", sep = " "))) %>%  
+    # add minutes field where lacking
+      separate(Time, c("my.hours", "hours.label", "my.min", "min.label"), sep = " ") %>%
+      mutate(Hours = as.numeric(my.hours) + as.numeric(my.min)/60) %>%
+      #mutate(Seconds = as.numeric(Seconds)) %>%
+      #mutate(Hours = Seconds/3600) %>%
+      dplyr::select(Hours, first.well:last.well) %>%
+      pivot_longer(cols = first.well:last.well, names_to = "Well", values_to = "OD600");
+    growth.data.long$OD600 = as.numeric(growth.data.long$OD600);
+    
+    # add treatment info
+    growth.all = inner_join(growth.data.long, plate.map, by = "Well");
+    
+    growth.all = growth.all %>%
+        select(Well, Hours, OD600, Strain, Medium, Treatment, Dilution)
+    
+    return(growth.all)
 }
 
 ```
@@ -133,45 +131,41 @@ Function to organize Bioscreen data
 
 organize_bioscreen = function(data.in)
 {    
-# output is data.frame = [Hours, Well, OD600, Treatment]
-
-plate.map = read_excel(data.in, sheet = "Informations", col_names = TRUE, skip = 29);
-growth.data = read_excel(data.in, sheet = "Raw data", col_names = TRUE, skip = 2);
-
-# plate map variables
-first.well = "1";
-last.well = "199";
-
-# parse plate.map
-plate.map = plate.map %>%
-  filter(!Treatment == "Empty") %>%
-  mutate(Well = as.character(Well));
-  
-# calculate elapsed time in hours
-time1 = hms("00:00:00"); # start time
-growth.data = growth.data %>%
-  mutate(Time_hms = hms(Time)) %>%
-  mutate(Time_Elapsed = Time_hms - time1) %>%
-  mutate(Hours = hour(Time_Elapsed) + 
-         (minute(Time_Elapsed) / 60) + 
-         (second(Time_Elapsed)/3600));
-  
-growth.data.long = growth.data %>%
-  select(-Blank) %>%
-  dplyr::select(Hours, first.well:last.well) %>%
-  pivot_longer(cols = first.well:last.well, names_to = "Well", values_to = "OD600");
-growth.data.long$OD600 = as.numeric(growth.data.long$OD600);
-
-# remove contaminated wells
-#growth.data.long = growth.data.long %>%
-#  filter(!Well %in% c("A04", "A05", "A06", "C03", "E02", "G01", "G04", "G05"));
-
-# add treatment info
-growth.all = inner_join(growth.data.long, plate.map, by = "Well");
-
-growth.all = select(growth.all, Well, Hours, OD600, Strain, Medium, Treatment, Dilution);
-
-return(growth.all)
+    # output is data.frame = [Hours, Well, OD600, Treatment]
+    
+    plate.map = read_excel(data.in, sheet = "Informations", col_names = TRUE, skip = 4);
+    growth.data = read_excel(data.in, sheet = "Raw data", col_names = TRUE, skip = 2);
+    
+    # plate map variables
+    first.well = "2";
+    last.well = "99";
+    
+    # parse plate.map
+    plate.map = plate.map %>%
+      filter(!Treatment == "[Ee]mpty") %>%
+      mutate(Well = as.character(Well));
+      
+    # calculate elapsed time in hours
+    time1 = hms("00:00:00"); # start time
+    growth.data = growth.data %>%
+      mutate(Time_hms = hms(Time)) %>%
+      mutate(Time_Elapsed = Time_hms - time1) %>%
+      mutate(Hours = hour(Time_Elapsed) + 
+             (minute(Time_Elapsed) / 60) + 
+             (second(Time_Elapsed)/3600));
+      
+    growth.data.long = growth.data %>%
+      select(-Blank) %>%
+      dplyr::select(Hours, first.well:last.well) %>%
+      pivot_longer(cols = first.well:last.well, names_to = "Well", values_to = "OD600");
+    growth.data.long$OD600 = as.numeric(growth.data.long$OD600);
+    
+    # add treatment info
+    growth.all = inner_join(growth.data.long, plate.map, by = "Well");
+    
+    growth.all = select(growth.all, Well, Hours, OD600, Strain, Medium, Treatment, Dilution);
+    
+    return(growth.all)
 }
 
 ```
@@ -188,22 +182,22 @@ NOTE: The cells and the blanks must have the same "medium" for the subtraction t
 
 norm_mean = function(growth.blanks, growth.cells)
 {
-# calc mean blank 
-growth.blanks = growth.blanks %>%
-    group_by(Medium, Hours)%>%
-        mutate(OD600_blank = mean(OD600)) %>%
-    ungroup;
-
-growth.blanks = growth.blanks %>%
-    select(Hours, Medium, OD600_blank) %>%
-    distinct();
-
-# subtract mean blank
-growth.cells = left_join(growth.cells, growth.blanks, by = c("Medium", "Hours"));
-growth.cells = growth.cells %>%
-    mutate(OD600_norm = OD600 - OD600_blank);
-
-return(growth.cells);
+    # calc mean blank 
+    growth.blanks = growth.blanks %>%
+        group_by(Medium, Hours)%>%
+            mutate(OD600_blank = mean(OD600)) %>%
+        ungroup;
+    
+    growth.blanks = growth.blanks %>%
+        select(Hours, Medium, OD600_blank) %>%
+        distinct();
+    
+    # subtract mean blank
+    growth.cells = left_join(growth.cells, growth.blanks, by = c("Medium", "Hours"));
+    growth.cells = growth.cells %>%
+        mutate(OD600_norm = OD600 - OD600_blank);
+    
+    return(growth.cells);
 }
 
 ```
@@ -217,22 +211,22 @@ Function to normalize OD600 readings by subtracting OD600 at time zero. Normaliz
 norm_initial = function(growth.cells)
 {
 
-# find first timepoint
-min_time = min(growth.cells$Hours);
+    # find first timepoint
+    min_time = min(growth.cells$Hours);
+        
+    # calc initial OD600
+    initial.OD = growth.cells %>%
+      filter(Hours == min_time) %>%
+      rename(OD600_t0 = OD600) %>%
+      select(Well, OD600_t0);
     
-# calc initial OD600
-initial.OD = growth.cells %>%
-  filter(Hours == min_time) %>%
-  rename(OD600_t0 = OD600) %>%
-  select(Well, OD600_t0);
-
-# normalize OD600 by subtracting initial reading
-growth.cells = left_join(growth.cells, initial.OD, by = "Well");
-growth.cells = growth.cells %>%
-  mutate(OD600 = OD600 - OD600_t0) %>%
-  select(-OD600_t0);
-
-return(growth.cells);
+    # normalize OD600 by subtracting initial reading
+    growth.cells = left_join(growth.cells, initial.OD, by = "Well");
+    growth.cells = growth.cells %>%
+      mutate(OD600 = OD600 - OD600_t0) %>%
+      select(-OD600_t0);
+    
+    return(growth.cells);
 }
 
 ```
@@ -352,9 +346,7 @@ growth.cells = norm_mean(growth.blanks, growth.cells);
 
 # Step 2: set time zero to OD600 = 0
 growth.cells = norm_initial(growth.cells);
-  
-}
-
+ 
 ```
 
 Plot growth: for each strain (panel) compare growth in each treatment (lines)
@@ -373,9 +365,10 @@ plot.cells = ggplot(growth.cells, aes(x=Hours, y=OD600, group=Well, color=Treatm
   facet_wrap (~Strain, ncol=7)+
   scale_x_continuous(breaks=seq(0, max(growth.cells$Hours), 24))+
   scale_y_continuous(breaks=seq(0, max(growth.cells$OD600 + 0.1), 0.4))+
-  scale_color_manual(values = c(color_vals))+
   theme_classic()+
-  mytheme;
+  mytheme+
+  guides(color = guide_legend(override.aes = list(size = 4))); # Big points in legend
+
 
 grid.arrange(plot.cells, ncol=1);
 
@@ -417,7 +410,9 @@ plot.cells.means = ggplot(growth.cells, aes(
   scale_x_continuous(breaks=seq(0, max(growth.cells$Hours), 24))+
   scale_y_continuous(breaks=seq(0, max(growth.cells$OD600 + 0.1), 0.4))+
   theme_classic()+
-  mytheme;
+  mytheme+
+  guides(color = guide_legend(override.aes = list(size = 4))); # Big points in legend
+
 
 grid.arrange(plot.cells.means, ncol=1);
 
@@ -447,7 +442,9 @@ plot.cells_strains = ggplot(growth.cells, aes(
   scale_x_continuous(breaks=seq(0, max(growth.cells$Hours), 12))+
   scale_y_continuous(breaks=seq(0, max(growth.cells$OD600 + 0.1), 0.4))+
   theme_classic()+
-  mytheme;
+  mytheme+
+  guides(color = guide_legend(override.aes = list(size = 4))); # Big points in legend
+
 
 grid.arrange(plot.cells_strains, ncol=1);
 
@@ -492,7 +489,6 @@ plot_maxOD = ggplot(growth_max, aes(
  ylab("max(OD600)")+
  coord_cartesian(ylim=c(0, 0.6))+
  scale_y_continuous(breaks=seq(0, 0.6, 0.1))+
- scale_color_manual(values = c(color_vals))+
  theme_classic()+
  mytheme;
 
@@ -508,8 +504,8 @@ Select treatments for growthcurver analysis
 ```{r select treatments for growthcurver}
 
 growth_gc = growth.cells %>%
-    filter(Strain %in% c("2")) %>%
-    filter(Treatment %in% c("0", "1"));
+    filter(Strain %in% c("51.24_21")) %>%
+    filter(Treatment %in% c("0% butanol"));
 
 ```
 
