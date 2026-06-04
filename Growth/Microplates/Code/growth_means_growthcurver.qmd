@@ -10,7 +10,7 @@ embed-resources: TRUE
 
 # Introduction
 
-Code to organize, plot, and analyze microbial growth in microplates measured with either a Bioscreen or Clario star instrument.
+Code to organize, plot, and analyze microbial growth in micro-plates measured with either a Bioscreen or Clario star instrument.
 
 # Setup
 
