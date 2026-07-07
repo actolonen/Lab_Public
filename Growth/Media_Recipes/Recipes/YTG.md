@@ -8,7 +8,7 @@ Prepare 1 liter of 2xYTG (see [Reference](https://sharebiology.com/2x-yt-medium/
 
 -   10 g yeast extract
 
--   5 g NaCl
+-   4 g NaCl
   
 -   2 g Cysteine HCl
    
