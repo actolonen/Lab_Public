@@ -11,6 +11,8 @@ Prepare 1 liter of 2xYTG (see [Reference](https://sharebiology.com/2x-yt-medium/
 -   5 g NaCl
 
 -   5 g glucose
+  
+-   2 g Cysteine HCl
    
 -   Add 900 ml H2O
 
@@ -20,9 +22,9 @@ Prepare 1 liter of 2xYTG (see [Reference](https://sharebiology.com/2x-yt-medium/
   
 -   Add 1 ml of Resazurin 0.1%
 
-- Add 2g cysteine HCl
-
 -   Autoclave or filter. The medium can be sterilized by autoclave or filtration. To store autoclaved media, close the bottle tightly to keep it reduced. If medium is filtered, transfer to the glove box to reduce.
+
+- Add glucose (20% filter sterilized solution) to a final concentration of 5 g/L glucose.
 
 ## 1xYTG: used for Genemat experiments
 
