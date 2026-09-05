@@ -11,4 +11,4 @@ We run fermentations with controlled pH, temperature, and agitation using Sartor
 
 We use MFCS software to measure the growth parameters during the fermentations. 
 
-This [code](./Code/biostat_template_.qmd) shows how to analyze fermentation parameters from MFCS files.
+This [code](./Code/biostat_template.qmd) shows how to analyze fermentation parameters from MFCS files.
