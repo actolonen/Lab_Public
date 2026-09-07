@@ -18,6 +18,8 @@ This code analyses the culture parameters of a Sartorius Biostat B-DCU experimen
 
 -   Medium:
 
+-   Duration:
+
 -   Objective:
 
 # Setup
@@ -26,13 +28,14 @@ Libraries
 
 ```{r Libraries}
 
-library(tidyverse);
 library(readxl);
 library(knitr)
 library(ggpubr);
 library(ggtext);
 library(gtable);
 library(grid);
+library(glue);
+library(quarto);
 
 ```
 
@@ -55,6 +58,8 @@ mytheme = theme(axis.text.x = element_text(size = 4),
                aspect.ratio =1,
                plot.caption=element_textbox_simple(padding = margin(10,0,10,0), hjust=0, size=10));
 
+# define duration for plotting
+total_time = 96;
 
 ```
 
@@ -309,7 +314,7 @@ plotOD
 
 ## Fermenter data
 
-Load MFCS daata
+Load MFCS data
 
 ```{r load MFCS data}
 
@@ -322,7 +327,10 @@ Define duration of experiment
 
 ```{r define duration}
 
-total_time = 96;
+total_time_F1 = round(max(data_F1$Hours), 2);
+total_time_F3 = round(max(data_F3$Hours), 2);
+my_message = glue("The total time for F1 was {total_time_F1} hours and for F3 was {total_time_F3} hours.");
+print(my_message);
 
 ```
 
