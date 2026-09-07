@@ -28,6 +28,7 @@ Libraries
 
 ```{r Libraries}
 
+library(tidyverse);
 library(readxl);
 library(knitr)
 library(ggpubr);
