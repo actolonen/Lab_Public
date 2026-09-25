@@ -13,4 +13,4 @@ We measure microbial growth at different volumetric scales:
 
 Typically, we measure microbial growth as optical density at 600 nm (OD600). However, we can also enumerate cells by flow cytometry
 
--   [Flow cytometry](./Cytometry/model_cytoflex.html) method to measure bacterial cell density.
+-   [Flow cytometry](./Cytometry/README.md) method to quantify bacterial cells.
