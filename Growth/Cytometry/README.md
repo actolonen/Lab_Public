@@ -1,0 +1,9 @@
+# Quantification of bacteria by flow cytometry
+
+In some cases, bacterial growth cannot be reliably quantified by optical density measurements. This may occur, for example, when the medium contains an insoluble carbon source or when the culture consists of two distinct bacterial populations. In such cases, bacterial abundance can instead be quantified using flow cytometry. We are using a [Beckman Cytoflex](https://goto.beckman.com/en/cytoflex/?campaign=1623714122&adgroup=61311338146&asset=705192651245&kw=facs%20flow%20cytometer&match=p&device=c&gad_source=1&gad_campaignid=1623714122&gclid=Cj0KCQjwt9jVBhDXARIsAFSP-6ccxUneT9WpIc_BT97NvR5tMVV2VHXAF_bz7zLtNmnLI-Zj77qDxq8aAriXEALw_wcB) instrument.
+
+[This code](./model_cytoflex.html) describes how to quantify bacteria from flow cytometry data (FCS files) using the R flowCore package. To help differentiate the bacterial cells from noise, the cells are labelled with SYBR green (excite=497 nm; emit=520 nm). Data is read into a flowFrame object and then bacterial cells are differentiated from background using a multi-step gating strategy:
+
+1.  Gate 1: Remove margin saturation. Bacteria are near the electronic noise floor on a CytoFlex, so you first need to strip saturated/margin events (values pinned at the detector max) and very low-signal noise events, triggering on the SYBR-green channel.
+2.  Gate 2: Identify SYBR stained cells. SYBR (FL1-A) vs SSC-A bivariate plot to separate true SYBR-stained bacteria from unstained debris/background.
+3.  Gate 3: Remove doublets. FSC-H vs FSC-A (or SSC-H vs SSC-A) to remove coincident/aggregated events (doublets), especially relevant for rod-shaped cells that can clump or pass at angles.
