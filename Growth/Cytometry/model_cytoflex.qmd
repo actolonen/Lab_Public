@@ -12,11 +12,13 @@ embed-resources: TRUE
 
 This file describes methods to visualize and filter flow cytometry data in .FCS files using the R flowCore package. Data was acquired using a Beckman CytoFlex instrument. Here, the samples are SYBR-stained bacterial cells. The goal is to accurately enumerate the number of bacteria in a defined volume.
 
+Example data: Flavobacterium growing in the BIostat on SD-YE 4 g/L glucose.
+
 ## Background
 
 FCS files contain all acquired data. However, running the Cytoflex requires 3 user-defined settings that affect what data is acquired:
 
--   Threshold = min signal for event, should set min signal manually.
+-   Threshold = min signal for event, should set min signal manually. The threshold should be set to exclude SYBR-negative events.
 
 -   Gain (hand signal on Cytoflex software). Note, the abort rate goes up if gain is too high.
 
@@ -71,10 +73,13 @@ Flags/Config
 rm(list = ls());
 setwd("/home/tolonen/Github/actolonen/Public/Lab_Public/Growth/Cytometry");
 
+# dilution factor of sample: cells are manually diluted before injection
+dilution_factor = 600;
+
 #Sys.setenv(QUARTO_PATH = "/home/tolonen/.conda/envs/Lab_Public/bin/quarto");
 Sys.setenv(
   PATH = paste(
-    "/home/tolonen/.conda/envs/Lab_Public/bin",
+    "/home/tolonen/.conda/envs/Flavolases/bin",
     Sys.getenv("PATH"),
     sep = .Platform$path.sep
   )
@@ -91,21 +96,22 @@ mytheme = theme(axis.text.x = element_text(size = 8),
                 plot.title = element_text(size = 8),
                );
 
-# dilution factor of sample: cells are manually diluted before injection
-dilution_factor = 4;
-
 ```
 
 File IO
 
 ```{r File IO}
 
-path_in = "/home/tolonen/Drives/Genoscope-googledrive/LabGroup_Shared/Lab_Projects/Flavobacterium/Cytometry/2026.04.15_Biostat_Wheatbran/FCS_files/";
+# INPUT
+my_path = "/home/tolonen/Github/actolonen/Public/Lab_Public/Growth/Cytometry/";
 
-file_in = "flavo_son_ble_F1_T1_1j__X4.fcs";
+file_in = "flavo_glucose_4gl_T3_DO_0.81_X600.fcs";
 
-data_in = paste0(path_in, file_in);
+data_in = paste0(my_path, file_in);
 data_1 = read.FCS(data_in, truncate_max_range = F, transformation = F);
+
+# OUTPUT
+file_out = paste0(my_path, "cell_counts_glucose.tsv");
 
 ```
 
@@ -153,7 +159,22 @@ kw = keyword(data_1);
 vol_nl =  as.numeric(kw["$VOL"]);
 vol_ul = vol_nl/1e3;
 vol_ml = vol_nl/1e6;
-output = paste0("The culture volume analyzed in this is sample is ", round(vol_ul, 2), " ul.")
+
+output = paste0("The culture volume analyzed in this is sample is ", round(vol_ul, 2), " ul. The dilution factor is ", dilution_factor, ". Thus, multiply the number of cells by ", round(dilution_factor/vol_ul, 2), " to get cells per microliter.");
+print(output);
+
+# get acquisition time
+# Extract time channel data directly
+time_data <- exprs(data_1)[, "Time"]
+
+# Get the scaling factor for time (default is typically 0.01s or 0.1s depending on instrument settings)
+time_step <- as.numeric(keyword(data_1, "$TIMESTEP")[[1]])
+if (is.na(time_step)) time_step <- 0.01  # Standard CytoFLEX default resolution if missing
+
+# Total run duration derived from max timestamp
+total_time_sec <- max(time_data) * time_step
+
+output = paste0("The acquisition time was ", round(total_time_sec, 2), ". As the volume was ", round(vol_ul, 2), ". The flow rate was ", round(vol_ul/total_time_sec, 2), " ul/sec.");
 print(output);
 
 ```
@@ -179,7 +200,7 @@ data_transformed <- transform(data_1, trans_list);
 
 ### Gate 1: Margin/saturation exclusion
 
-```{r saturation exclusion, fig.cap = "Fig: Density plots showing the distribution of values in the channels to analyze. There does not appear to be channel saturation. However, FSC-A has a wide distribution; might this be because the cells are rod-shaped?"}
+```{r saturation exclusion, fig.cap = "Fig: Density plots showing the distribution of values in the channels to analyze. The goal of these plots is to see if the distributions are tight, and whether the values are piled up at the max values (saturation). Extremely low and high values should be excluded."}
 
 # examine saturation using univariate plots
 
@@ -211,35 +232,41 @@ plots.all <- grid.arrange(grobs = plots.list, ncol = 2, draw = FALSE)
 # Explicitly draw only the graphics
 grid.draw(plots.all)
 
-# # Margin/saturation exclusion (remove events pinned at max range)
-# range_gate <- rectangleGate("FSC-A" = c(0, 262143), 
-#                            "SSC-A" = c(0, 262143), 
-#                            "FITC-A" = c(0, 262143),
-#                            filterId = "nonSaturated");
-
-# # apply the gate
-# data_saturation = Subset(data_transformed, range_gate);
-
 data_gate_1 = data_transformed;
+
+```
+
+Removed saturated data (if needed).
+
+```{r remove saturated data, eval = F}
+
+# # Margin/saturation exclusion (remove events pinned at max range)
+range_gate <- rectangleGate("FSC-A" = c(0, 262143), 
+                           "SSC-A" = c(0, 262143), 
+                           "FITC-A" = c(0, 262143),
+                           filterId = "nonSaturated");
+
+# apply the gate
+data_transformed = Subset(data_transformed, range_gate);
 
 ```
 
 ### Gate 2: SYBR fluorescence, side scatter
 
-Plot: SSC (violet) vs SYBR fluorescence
+Plot: SSC (violet) vs SYBR fluorescence: Violet side scatter (405 nm) resolves small particles better than FSC or blue SSC.
 
 ```{r plot side-scatter vs SYBR fluorescence, warning = F, fig.cap = "Fig: Plot of SYBR fluorescence (x-axis) vs side scatter (y-axis). Red rectangle shows applied gate; percent is events passing the gate."}
 
 # Define the gate boundaries on your transformed scale
 my_gate <- rectangleGate(
   filterId = "SYBR_bacteria",
-  "FL1-A"   = c(4.65, 5.7),  # min and max for X-axis
-  "SSC_1-A" = c(3.9, 5)   # min and max for Y-axis
+  "FL1-A"   = c(3.9, 5),  # min and max for X-axis
+  "SSC_1-A" = c(3.5, 4.8)   # min and max for Y-axis
 );
 
 # Add the gate to autoplot
-plot_sybr <- autoplot(data_transformed, "FL1-A", "SSC_1-A", bins = 1000) + 
-  coord_cartesian(xlim = c(3, 8), ylim = c(3, 6)) +
+plot_sybr <- autoplot(data_transformed, "FL1-A", "SSC_1-A", bins = 200) + 
+  coord_cartesian(xlim = c(2, 6), ylim = c(2, 6)) +
   geom_gate(my_gate, colour = "red", size = 0.5) +  # Overlay gate line
   geom_stats(type = "percent") +                   # Optional: Display population %
   theme_classic();
@@ -258,7 +285,7 @@ Plot SSC-A vs SSC-H
 
 # SSC
 plot_doublet = autoplot(data_gate_2, "SSC_1-A", "SSC_1-H", bins = 500) + 
-  coord_cartesian(xlim = c(3.5, 5.5), ylim = c(3.5, 5.5)) +
+  coord_cartesian(xlim = c(3, 5.5), ylim = c(3, 5.5)) +
   labs(x = "SSC_1-A", y = "SSC_1-H") +
   theme_classic()
 plot_doublet
@@ -285,10 +312,10 @@ Apply a polygon gate to the SSC-A vs SSC-H plot
 # 1. Define vertex coordinates (order points sequentially around the shape)
 gate_coords <- matrix(
   c(
-    3.9, 3.85,  # Point 1 (x, y)
-    5, 4.85,  # Point 2
-    5, 5.1,  # Point 3
-    3.9, 4.1),
+    3, 3,  # Point 1 (x, y)
+    5, 4.8,  # Point 2
+    5, 5.2,  # Point 3
+    3, 3.4),
   ncol = 2,
   byrow = TRUE,
   dimnames = list(NULL, c("SSC_1-A", "SSC_1-H")) # Must match object channel names
@@ -299,7 +326,7 @@ poly_gate <- polygonGate(filterId = "Singlets", .gate = gate_coords);
 
 # Add the gate to autoplot
 plot_doublet = autoplot(data_gate_2, "SSC_1-A", "SSC_1-H", bins = 500) + 
-  coord_cartesian(xlim = c(3.5, 5.5), ylim = c(3.5, 5.5)) +
+  coord_cartesian(xlim = c(3, 5.5), ylim = c(3, 5.5)) +
   labs(x = "SSC_1-A", y = "SSC_1-H") +
   geom_gate(poly_gate, colour = "red", size = 0.5) +  # Overlay gate line
   geom_stats(type = "percent") +                   # Optional: Display population %
@@ -319,7 +346,7 @@ Plot SSC-A vs FSC-A
 ```{r plot SSC-A vs FSC-H, fig.cap = "Fig: comparision of forward scatter area (x-axis) vs side scatter area (y-axis)."}
 
 # FSC
-plot_size = autoplot(data_gate_3, "FSC-A", "SSC_1-A", bins = 500) + 
+plot_size = autoplot(data_gate_3, "FSC-A", "SSC_1-A", bins = 100) + 
   coord_cartesian(xlim = c(0, 5), ylim = c(0, 5)) +
   labs(x = "FSC-A", y = "SSC_1-A") +
   theme_classic()
@@ -351,10 +378,55 @@ print(output);
 
 ```
 
+Output cell counts
+
+```{r output cell counts}
+
+# Output variables
+new_file <- file_in
+new_concentration <- as.character(conc_sci);
+
+# Input variables
+new_file <- file_in
+new_concentration <- conc_sci
+
+if (file.exists(file_out)) {
+  # Read existing file
+  previous_data <- read_tsv(
+    file_out, 
+    col_types = cols(Concentration_cells_ml = col_character()),
+    show_col_types = FALSE);
+  
+  if (new_file %in% previous_data$File) {
+    # Update existing entry with explicit type matching
+    new_data <- previous_data %>%
+      mutate(Concentration_cells_ml = if_else(
+        File == new_file, 
+        as.character(new_concentration), 
+        as.character(Concentration_cells_ml)
+      ))
+  } else {
+    # Append new row
+    new_data <- previous_data %>%
+      add_row(
+        File = new_file, 
+        Concentration_cells_ml = as.character(new_concentration)
+      )
+  }
+} else {
+  # Initialize tibble if file does not exist
+  new_data <- tibble(
+    File = new_file,
+    Concentration_cells_ml = as.character(new_concentration)
+  )
+}
+
+# Output back to file
+write_tsv(new_data, file_out)
+
+# Write updated file back out
+write_tsv(new_data, file_out)
+
+```
+
 # Conclusions
-
--   Univariate density plots show that FSC-A is a very wide distribution, which may be because the cells are rod-shared. I this focus on side-scatter for these analyses.
-
--   Violet side-scatter vs SYBR appears effective to differentiate cells from background.
-
--   SSC-A vs SSC-H appears effective to remove doublets.
