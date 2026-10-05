@@ -160,8 +160,7 @@ vol_nl =  as.numeric(kw["$VOL"]);
 vol_ul = vol_nl/1e3;
 vol_ml = vol_nl/1e6;
 
-output = paste0("The culture volume analyzed in this is sample is ", round(vol_ul, 2), " ul. The dilution factor is ", dilution_factor, ". Thus, multiply the number of cells by ", round(dilution_factor/vol_ul, 2), " to get cells per microliter.");
-print(output);
+cat(paste0("The culture volume analyzed in this is sample is ", round(vol_ul, 2), " ul. The dilution factor is ", dilution_factor, ". Thus, multiply the number of cells by ", round(dilution_factor/vol_ul, 2), " to get cells per microliter."));
 
 # get acquisition time
 # Extract time channel data directly
@@ -174,8 +173,7 @@ if (is.na(time_step)) time_step <- 0.01  # Standard CytoFLEX default resolution 
 # Total run duration derived from max timestamp
 total_time_sec <- max(time_data) * time_step
 
-output = paste0("The acquisition time was ", round(total_time_sec, 2), ". As the volume was ", round(vol_ul, 2), ". The flow rate was ", round(vol_ul/total_time_sec, 2), " ul/sec.");
-print(output);
+cat(paste0("The acquisition time was ", round(total_time_sec, 2), " seconds. As the volume was ", round(vol_ul, 2), " ul, the flow rate was ", round(vol_ul/total_time_sec, 2), " ul/sec."));
 
 ```
 
@@ -198,11 +196,34 @@ data_transformed <- transform(data_1, trans_list);
 
 ## Gate data
 
-### Gate 1: Margin/saturation exclusion
+Define gates
+
+```{r define gates}
+
+# SYBR-fluorescence
+f1a_min = 4;
+f1a_max = 5;
+
+# Violet side-scatter
+ssc1a_min = 3.75;
+ssc1a_max = 4.75;
+
+# Doublet discrimination: rectangular gate around violet SSC-A vs SSC-H
+
+p1_x = 2.9;
+p1_y = 2.9;
+p2_x = 5;
+p2_y = 4.8;
+p3_x = 5;
+p3_y = 5.2;
+p4_x = 2.9;
+p4_y = 3.4;
+
+```
+
+### Gate 1: Univariate plots of channels
 
 ```{r saturation exclusion, fig.cap = "Fig: Density plots showing the distribution of values in the channels to analyze. The goal of these plots is to see if the distributions are tight, and whether the values are piled up at the max values (saturation). Extremely low and high values should be excluded."}
-
-# examine saturation using univariate plots
 
 # extract data to plot as df
 data_plot = as.data.frame(data_transformed@exprs);
@@ -211,11 +232,12 @@ data_plot = as.data.frame(data_transformed@exprs);
 plots.list = list();  # new empty list
 counter = 1
 
-for (i in seq_along(channels_to_transform)) {
+for (i in seq_along(channels_to_transform)) 
+{
   my_channel <- channels_to_transform[i]
   
   # Use .data[[my_channel]] to resolve lazy evaluation bug
-  plots.list[[i]] <- ggplot(data_plot, aes(x = .data[[my_channel]])) +
+  my_plot = ggplot(data_plot, aes(x = .data[[my_channel]])) +
     geom_density(fill = "skyblue", alpha = 0.5, color = "blue") +
     theme_classic() +
     labs(
@@ -224,6 +246,19 @@ for (i in seq_along(channels_to_transform)) {
       title = my_channel # Dynamic title
     )+
     mytheme;
+
+    # add gates, if appropriate
+    if (my_channel == "FL1-A") 
+    {
+      my_plot = my_plot + geom_vline(xintercept = c(f1a_min, f1a_max), color = "red", linetype = "dashed")
+    }
+    if (my_channel == "SSC_1-A") 
+    {
+      my_plot = my_plot + geom_vline(xintercept = c(ssc1a_min, ssc1a_max), color = "red", linetype = "dashed")
+    }
+    
+    plots.list[[i]] = my_plot;
+    
 }
 
 # Create the layout without auto-printing the object
@@ -260,8 +295,8 @@ Plot: SSC (violet) vs SYBR fluorescence: Violet side scatter (405 nm) resolves s
 # Define the gate boundaries on your transformed scale
 my_gate <- rectangleGate(
   filterId = "SYBR_bacteria",
-  "FL1-A"   = c(3.9, 5),  # min and max for X-axis
-  "SSC_1-A" = c(3.5, 4.8)   # min and max for Y-axis
+  "FL1-A"   = c(f1a_min, f1a_max),  # min and max for X-axis
+  "SSC_1-A" = c(ssc1a_min, ssc1a_max)   # min and max for Y-axis
 );
 
 # Add the gate to autoplot
@@ -312,10 +347,10 @@ Apply a polygon gate to the SSC-A vs SSC-H plot
 # 1. Define vertex coordinates (order points sequentially around the shape)
 gate_coords <- matrix(
   c(
-    3, 3,  # Point 1 (x, y)
-    5, 4.8,  # Point 2
-    5, 5.2,  # Point 3
-    3, 3.4),
+    p1_x, p1_y,  # Point 1 (x, y)
+    p2_x, p2_y,  # Point 2
+    p3_x, p3_y,  # Point 3
+    p4_x, p4_y),
   ncol = 2,
   byrow = TRUE,
   dimnames = list(NULL, c("SSC_1-A", "SSC_1-H")) # Must match object channel names
@@ -366,15 +401,13 @@ Calculate number of cells per ml
 # Get the number of events in your filtered data
 total_events_final <- nrow(data_gate_4);
 events_passing = round(100 * (total_events_final / total_events_initial), 2);
-output = paste0(events_passing, "% of acquired events passed gating");
-print(output);
+cat(paste0(events_passing, "% of acquired events passed gating\n"));
 
 # Calculate concentration
 concentration = dilution_factor * (total_events_final / vol_ml);
 conc_sci = format(concentration, scientific = TRUE, digits = 3);
 
-output = paste0("The concentration is ", conc_sci, " cells/mL\n");
-print(output);
+cat(paste0("The concentration is ", conc_sci, " cells/mL\n"));
 
 ```
 
