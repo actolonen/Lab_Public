@@ -1,6 +1,10 @@
 # Quantification of bacteria by flow cytometry
 
-In some cases, bacterial growth cannot be reliably quantified by optical density measurements. This may occur, for example, when the medium contains an insoluble carbon source or when the culture consists of two distinct bacterial populations. In such cases, bacterial abundance can instead be quantified using flow cytometry. We are using a [Beckman Cytoflex](https://goto.beckman.com/en/cytoflex/?campaign=1623714122&adgroup=61311338146&asset=705192651245&kw=facs%20flow%20cytometer&match=p&device=c&gad_source=1&gad_campaignid=1623714122&gclid=Cj0KCQjwt9jVBhDXARIsAFSP-6ccxUneT9WpIc_BT97NvR5tMVV2VHXAF_bz7zLtNmnLI-Zj77qDxq8aAriXEALw_wcB) instrument.
+In some cases, bacterial growth cannot be reliably quantified by optical density measurements. This may occur, for example, when the medium contains an insoluble carbon source or when the culture consists of two distinct bacterial populations. In such cases, bacterial abundance can instead be quantified using flow cytometry. We are using a [Beckman Cytoflex](https://goto.beckman.com/en/cytoflex/?campaign=1623714122&adgroup=61311338146&asset=705192651245&kw=facs%20flow%20cytometer&match=p&device=c&gad_source=1&gad_campaignid=1623714122&gclid=Cj0KCQjwt9jVBhDXARIsAFSP-6ccxUneT9WpIc_BT97NvR5tMVV2VHXAF_bz7zLtNmnLI-Zj77qDxq8aAriXEALw_wcB) instrument with three lasers:
+
+-   Violet Laser: 405 nm
+-   Blue Laser: 488 nm
+-   Red Laser: 638 nm
 
 [This code](./model_cytoflex.qmd) and [Quarto html](./model_cytoflex.html) describes how to quantify bacteria from flow cytometry data (FCS files) using the R flowCore package. To help differentiate the bacterial cells from noise, the cells are labelled with SYBR green (excite=497 nm; emit=520 nm). Data is read into a flowFrame object and then bacterial cells are differentiated from background using a multi-step gating strategy:
 
