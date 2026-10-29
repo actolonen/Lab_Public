@@ -1,0 +1,196 @@
+---
+title: "Convert RNAseq counts to TPM"
+author: "Andrew Tolonen"
+format: html
+editor: visual
+toc: TRUE
+code-fold: TRUE
+embed-resources: TRUE
+---
+
+# Introduction
+
+Here, we convert RNAseq counts tables from featureCounts into a table of transcripts per million (TPM) for each gene.
+
+## Steps to generate raw gene counts from Fastq files
+
+These steps were previously run on the Genoscope cluster:
+
+1.  Map fastq reads to reference genome using bowtie2
+
+    \% bowtie2 -x \[genome_index\] -1 \[fastq file 1\] -2 \[fastq file 2\] -p 8 -S \[sam file\]
+
+2.  Convert sam file to bam file
+
+    \% samtools sort -\@ 8 -o \[sorted bam file\] \[sam file\]
+
+    \% samtools index\[sorted bam file\]
+
+3.  Calculate raw gene counts from bam file using featureCounts
+
+    \% featureCounts -T 8 -p -s 2 -t gene -g locus_tag -a \[GFF file\] -o \[counts file\] \[bam file\]
+
+# Setup
+
+Libraries
+
+```{r Libraries, message = F}
+
+# libraries to include
+library(knitr);
+library(tidyverse);
+library(readxl);
+library(readr);
+library(gridExtra);
+library(ggpubr);
+library(glue);
+
+```
+
+Flags/Config
+
+```{r flags and config}
+
+rm(list = ls());
+setwd("");
+
+mytheme = theme(axis.text.x = element_text(size = 8), 
+                axis.text.y = element_text(size = 8), 
+                axis.title.x = element_text(size = 8), 
+                axis.title.y = element_text(size = 8),
+                strip.text.x = element_text(size = 8),
+                strip.text.y = element_text(size = 8),
+                legend.position = "none", 
+                aspect.ratio = 1,
+                plot.title = element_text(size = 8),
+               );
+
+```
+
+File IO
+
+```{r file IO}
+
+# counts files
+path_counts = "";
+
+# output TPM file
+path_out = "";
+file_out = "tpm_file.tsv";
+data_out = paste0(path_out, file_out);
+
+```
+
+# Functions
+
+Counts to TPM
+
+```{r counts to TPM function}
+
+# Function to calculate TPM
+counts_to_tpm <- function(counts, lengths) {
+  # Step 1: Calculate RPK (Reads Per Kilobase)
+  # Divide lengths by 1000 to convert base pairs to kilobases
+  rpk <- counts / (lengths / 1000)
+  
+  # Step 2: Normalize RPK by total RPK per sample (in millions)
+  # colSums(rpk) computes the total RPK per sample
+  tpm <- sweep(rpk, 2, colSums(rpk) / 1e6, "/")
+  
+  return(tpm)
+}
+
+```
+
+# Main
+
+Load counts data, add sample descriptions
+
+```{r load counts files}
+
+samples = c("AA", "AB", "AC", "AD","AE", "AF", "AG", "AH", "AI");
+
+# declare counts data frame
+data_counts <- data.frame(
+  Geneid = character(),
+  Start = numeric(),
+  End = numeric(),
+  Strand = character(),
+  Length = numeric(),
+  Counts = numeric(),
+  File = character(),
+  stringsAsFactors = FALSE
+)
+
+# load data
+for (my_sample in samples)
+{
+    counts_file = paste0(path_counts, "/", my_sample, "_counts.txt");
+    data_in = read.table(counts_file, header = T, sep = "\t", skip = 1);
+    data_in = data_in %>%
+        rename_with(~ "Counts", contains("sorted.bam")) %>%
+        select(Geneid, Start, End, Strand, Length, Counts) %>%
+        mutate(File = my_sample);
+    data_counts = rbind(data_counts, data_in);
+}
+
+# add annotation
+data_counts <- data_counts %>%
+  mutate(
+    Sample = case_when(
+      File == "AA" ~ "WT-1",
+      File == "AB" ~ "WT-2",
+      File == "AC" ~ "WT-3",
+      File == "AD" ~ "S1-1",
+      File == "AE" ~ "S1-2",
+      File == "AF" ~ "S1-3",
+      File == "AG" ~ "S5-1",
+      File == "AH" ~ "S5-2",
+      File == "AI" ~ "S5-3",  
+      TRUE ~ NA_character_  # Optional: keeps unmatched rows as NA
+    )
+  )
+
+```
+
+Convert raw counts to TPM
+
+TPM is calculated in two steps:
+
+1.  Normalize raw counts for gene length (RPKM)
+
+2.  Normalize RPKs for sequencing depth (TPM)
+
+```{r convert raw counts to TPM}
+
+data_tpm <- data_counts %>%
+  # 1. Calculate Reads Per Kilobase (RPK)
+  mutate(RPK = Counts / (Length / 1000)) %>%
+  # 2. Group by sample
+  group_by(File) %>%
+  # 3. Scale RPK by the sum of RPKs per sample (in millions)
+  mutate(
+    RPK_total = sum(RPK),
+    TPM = (RPK / RPK_total) * 1e6
+  ) %>%
+  ungroup()
+
+# print out table of TPM values for all samples
+
+```
+
+Output TPM values
+
+```{r output tpm values}
+
+tpm_out <- data_tpm %>%
+    select(Geneid, Sample, TPM) %>%
+    pivot_wider(id_cols = Geneid, names_from = Sample, values_from = TPM);
+
+write.table(tpm_out,
+           file = data_out,
+           row.names = F,
+           col.names = T, 
+           sep = "\t");
+
+```
